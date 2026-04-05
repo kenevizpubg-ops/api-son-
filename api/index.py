@@ -1,43 +1,16 @@
-from flask import Flask, request, jsonify, render_template_string, session
+from flask import Flask, request, jsonify, render_template_string
 import requests
 import json
 import base64
 import random
 from datetime import datetime
-import os
 
 app = Flask(__name__)
-app.secret_key = "keneviz_secret_key_2026"
 
 ADMIN_KEY = "devkeneviz"
 
-if not os.path.exists('data'):
-    os.makedirs('data')
-
-def load_counter():
-    try:
-        with open('data/counter.json', 'r') as f:
-            return json.load(f)
-    except:
-        return {"visitors": 0, "api_usage": {}}
-
-def save_counter(data):
-    with open('data/counter.json', 'w') as f:
-        json.dump(data, f)
-
-def load_messages():
-    try:
-        with open('data/messages.json', 'r') as f:
-            return json.load(f)
-    except:
-        return []
-
-def save_messages(messages):
-    with open('data/messages.json', 'w') as f:
-        json.dump(messages, f)
-
-counter_data = load_counter()
-messages_data = load_messages()
+counter_data = {"visitors": 0, "api_usage": {}}
+messages_data = []
 
 APIS_DB = {
     1001: {
@@ -355,7 +328,7 @@ HTML_TEMPLATE = '''
             display: none;
         }
         .result.show { display: block; }
-        .result pre { color: #0f0; font-size: 0.75em; white-space: pre-wrap; font-family: monospace; }
+        .result pre { color: #0f0; font-size: 0.8em; white-space: pre-wrap; font-family: monospace; }
         .result-image { max-width: 100%; border-radius: 5px; }
         .result-audio { width: 100%; }
         
@@ -428,6 +401,23 @@ HTML_TEMPLATE = '''
             overflow-y: auto;
         }
         .admin-modal-content h3 { color: #0f0; margin-bottom: 20px; }
+        .admin-modal-content input, .admin-modal-content textarea {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            background: #111;
+            border: 1px solid #0f0;
+            border-radius: 5px;
+            color: #0f0;
+        }
+        .admin-modal-content button {
+            background: #000;
+            color: #0f0;
+            border: 1px solid #0f0;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -448,11 +438,11 @@ HTML_TEMPLATE = '''
         <div class="stats-bar">
             <div class="stat-card">
                 <h3>👥 TOPLAM ZİYARETÇİ</h3>
-                <div class="number" id="visitorCount">{{ visitor_count }}</div>
+                <div class="number">{{ visitor_count }}</div>
             </div>
             <div class="stat-card">
                 <h3>📊 API KULLANIM</h3>
-                <div class="number" id="apiUsageCount">{{ total_api_usage }}</div>
+                <div class="number">{{ total_api_usage }}</div>
             </div>
         </div>
         
@@ -481,44 +471,17 @@ HTML_TEMPLATE = '''
                 </div>
                 <button onclick="checkAdminKey()">GİRİŞ</button>
                 <div id="adminTools" style="display:none; margin-top:20px;">
-                    <hr>
-                    <h3>➕ YENİ API EKLE</h3>
-                    <div class="form-group">
-                        <label>API ADI:</label>
-                        <input type="text" id="newApiName">
-                    </div>
-                    <div class="form-group">
-                        <label>ENDPOINT URL:</label>
-                        <input type="text" id="newApiEndpoint">
-                    </div>
-                    <div class="form-group">
-                        <label>PARAMETRELER (JSON):</label>
-                        <textarea id="newApiParams" rows="2" placeholder='{"param": ""}'></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label>METOD (GET/POST):</label>
-                        <input type="text" id="newApiMethod" value="GET">
-                    </div>
-                    <div class="form-group">
-                        <label>RESPONSE TİPİ:</label>
-                        <input type="text" id="newApiResponseType" value="json">
-                    </div>
-                    <div class="form-group">
-                        <label>AÇIKLAMA:</label>
-                        <input type="text" id="newApiDesc">
-                    </div>
+                    <hr><h3>➕ YENİ API EKLE</h3>
+                    <input type="text" id="newApiName" placeholder="API Adı">
+                    <input type="text" id="newApiEndpoint" placeholder="Endpoint URL">
+                    <textarea id="newApiParams" rows="2" placeholder='{"param": ""}'></textarea>
+                    <input type="text" id="newApiMethod" value="GET">
+                    <input type="text" id="newApiResponseType" value="json">
+                    <input type="text" id="newApiDesc" placeholder="Açıklama">
                     <button onclick="addApi()">➕ EKLE</button>
-                    <hr>
-                    <h3>🗑️ API SİL</h3>
-                    <div class="form-group">
-                        <label>API ID:</label>
-                        <input type="number" id="deleteApiId">
-                    </div>
+                    <hr><h3>🗑️ API SİL</h3>
+                    <input type="number" id="deleteApiId" placeholder="API ID">
                     <button onclick="deleteApi()">🗑️ SİL</button>
-                    <hr>
-                    <h3>📋 TÜM API'LER</h3>
-                    <button onclick="listApis()">📋 LİSTELE</button>
-                    <pre id="apiListResult" style="margin-top:10px; background:#000; padding:10px; border:1px solid #0f0; border-radius:5px; font-size:10px; display:none;"></pre>
                 </div>
             </div>
         </div>
@@ -536,7 +499,7 @@ HTML_TEMPLATE = '''
     <div id="adminModal" class="admin-modal">
         <div class="admin-modal-content">
             <h3>🔐 ADMIN PANEL</h3>
-            <input type="password" id="adminKeyInput2" placeholder="Admin Key">
+            <input type="password" id="adminKeyInput2" placeholder="devkeneviz">
             <button onclick="checkAdminKey2()">Giriş</button>
             <button onclick="closeAdminModal()">Kapat</button>
             <div id="adminTools2" style="display:none; margin-top:20px;">
@@ -620,23 +583,13 @@ HTML_TEMPLATE = '''
                     resultDiv.innerHTML = `<pre style="color:#f00;">❌ HATA: ${data.error}</pre>`;
                 }
                 resultDiv.classList.add('show');
-                updateApiUsage(apiId);
+                await fetch(`/api/usage/${apiId}`, { method: 'POST' });
+                location.reload();
             } catch(e) {
                 resultDiv.innerHTML = `<pre style="color:#f00;">❌ BAĞLANTI HATASI: ${e.message}</pre>`;
                 resultDiv.classList.add('show');
             } finally {
                 loadingDiv.classList.remove('show');
-            }
-        }
-        
-        async function updateApiUsage(apiId) {
-            await fetch(`/api/usage/${apiId}`, { method: 'POST' });
-            const countSpan = document.querySelector(`.api-card[data-api-id="${apiId}"] .api-stats`);
-            if (countSpan) {
-                let current = apiUsage[apiId] || 0;
-                apiUsage[apiId] = current + 1;
-                countSpan.innerHTML = `📊 Kullanım: ${apiUsage[apiId]} kez`;
-                document.getElementById('apiUsageCount').innerText = Object.values(apiUsage).reduce((a,b) => a+b, 0);
             }
         }
         
@@ -649,16 +602,13 @@ HTML_TEMPLATE = '''
             const name = document.getElementById('msgName').value;
             const text = document.getElementById('msgText').value;
             if (!name || !text) { alert('Ad ve mesaj girin!'); return; }
-            const res = await fetch('/api/message', {
+            await fetch('/api/message', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, text })
             });
-            if (res.ok) {
-                alert('Mesaj gönderildi!');
-                document.getElementById('msgText').value = '';
-                location.reload();
-            }
+            alert('Mesaj gönderildi!');
+            location.reload();
         }
         
         function openAdminModal() { document.getElementById('adminModal').classList.add('show'); }
@@ -668,14 +618,14 @@ HTML_TEMPLATE = '''
             const key = document.getElementById('adminKeyInput').value;
             if (key === ADMIN_KEY) {
                 document.getElementById('adminTools').style.display = 'block';
-            } else { alert('Hatalı key!'); }
+            } else { alert('Hatali key!'); }
         }
         
         function checkAdminKey2() {
             const key = document.getElementById('adminKeyInput2').value;
             if (key === ADMIN_KEY) {
                 document.getElementById('adminTools2').style.display = 'block';
-            } else { alert('Hatalı key!'); }
+            } else { alert('Hatali key!'); }
         }
         
         function toggleAdmin() {
@@ -684,7 +634,7 @@ HTML_TEMPLATE = '''
         
         async function addApi() {
             const key = document.getElementById('adminKeyInput').value;
-            if (key !== ADMIN_KEY) { alert('Admin key hatalı'); return; }
+            if (key !== ADMIN_KEY) { alert('Admin key hatali'); return; }
             let params = {};
             try { params = JSON.parse(document.getElementById('newApiParams').value || '{}'); } catch(e) {}
             const res = await fetch('/api/admin/add', {
@@ -706,7 +656,7 @@ HTML_TEMPLATE = '''
         
         async function addApi2() {
             const key = document.getElementById('adminKeyInput2').value;
-            if (key !== ADMIN_KEY) { alert('Admin key hatalı'); return; }
+            if (key !== ADMIN_KEY) { alert('Admin key hatali'); return; }
             let params = {};
             try { params = JSON.parse(document.getElementById('newApiParams2').value || '{}'); } catch(e) {}
             const res = await fetch('/api/admin/add', {
@@ -728,7 +678,7 @@ HTML_TEMPLATE = '''
         
         async function deleteApi() {
             const key = document.getElementById('adminKeyInput').value;
-            if (key !== ADMIN_KEY) { alert('Admin key hatalı'); return; }
+            if (key !== ADMIN_KEY) { alert('Admin key hatali'); return; }
             const id = document.getElementById('deleteApiId').value;
             if (!id) { alert('ID girin'); return; }
             const res = await fetch(`/api/admin/delete/${id}`, { method: 'DELETE', headers: { 'X-Admin-Key': key } });
@@ -739,23 +689,13 @@ HTML_TEMPLATE = '''
         
         async function deleteApi2() {
             const key = document.getElementById('adminKeyInput2').value;
-            if (key !== ADMIN_KEY) { alert('Admin key hatalı'); return; }
+            if (key !== ADMIN_KEY) { alert('Admin key hatali'); return; }
             const id = document.getElementById('deleteApiId2').value;
             if (!id) { alert('ID girin'); return; }
             const res = await fetch(`/api/admin/delete/${id}`, { method: 'DELETE', headers: { 'X-Admin-Key': key } });
             const data = await res.json();
             if (data.success) { alert('Silindi!'); location.reload(); }
             else { alert('Hata: ' + data.error); }
-        }
-        
-        async function listApis() {
-            const key = document.getElementById('adminKeyInput').value;
-            if (key !== ADMIN_KEY) { alert('Admin key hatalı'); return; }
-            const res = await fetch('/api/admin/list?admin_key=' + key);
-            const data = await res.json();
-            const resultDiv = document.getElementById('apiListResult');
-            resultDiv.style.display = 'block';
-            resultDiv.innerHTML = JSON.stringify(data, null, 2);
         }
         
         renderApis();
@@ -767,7 +707,6 @@ HTML_TEMPLATE = '''
 @app.route('/')
 def index():
     counter_data['visitors'] += 1
-    save_counter(counter_data)
     total_api = sum(counter_data.get('api_usage', {}).values())
     return render_template_string(HTML_TEMPLATE, 
                                   apis=APIS_DB, 
@@ -784,7 +723,6 @@ def query_api(api_id):
     if 'api_usage' not in counter_data:
         counter_data['api_usage'] = {}
     counter_data['api_usage'][str(api_id)] = counter_data['api_usage'].get(str(api_id), 0) + 1
-    save_counter(counter_data)
     
     api = APIS_DB[api_id]
     params = request.json.get('params', {})
@@ -824,7 +762,6 @@ def update_usage(api_id):
     if 'api_usage' not in counter_data:
         counter_data['api_usage'] = {}
     counter_data['api_usage'][str(api_id)] = counter_data['api_usage'].get(str(api_id), 0) + 1
-    save_counter(counter_data)
     return jsonify({"success": True})
 
 @app.route('/api/message', methods=['POST'])
@@ -838,7 +775,6 @@ def add_message():
             'text': text,
             'date': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         })
-        save_messages(messages_data)
     return jsonify({"success": True})
 
 @app.route('/api/admin/add', methods=['POST'])
